@@ -1,4 +1,4 @@
-from socketserver import ThreadingUDPServer, BaseRequestHandler
+from socketserver import ThreadingTCPServer, BaseRequestHandler
 import structlog
 
 import click
@@ -6,37 +6,35 @@ import click
 LOG = structlog.get_logger()
 
 
-class SimpleUdpHandler(BaseRequestHandler):
+class SimpleTCPHandler(BaseRequestHandler):
     """
     Simple request handler for UDP that will log incoming data.
     """
 
     def handle(self):
-        data = self.request[0]
-        socket = self.request[1]
-        LOG.debug(f"Received UDP Message",
+        data = self.request.recv(1024)
+        LOG.debug(f"Received TCP Message",
                   data=data, host=self.client_address[0],
                   port=self.client_address[1])
 
 
-class EchoUdpHandler(BaseRequestHandler):
+
+class EchoTCPHandler(BaseRequestHandler):
     """
     Simple requesthandler that will echo the received data back to the sender.
     """
 
     def handle(self):
-        data = self.request[0]
-        socket = self.request[1]
+        data = self.request.recv(1024)
         LOG.debug(
-            f"Received UDP Message",
-
-                data=data,
-                host=self.client_address[0],
-                port=self.client_address[1],
+            f"Received TCP Message",
+            data=data,
+            host=self.client_address[0],
+            port=self.client_address[1],
 
         )
 
-        socket.sendto(data, self.client_address)
+        self.request.sendall(data)
 
 
 @click.command()
@@ -51,18 +49,18 @@ class EchoUdpHandler(BaseRequestHandler):
     default=False,
     help="If the server should echo the data back to the sender",
 )
-def udp(host, port, echo):
+def tcp(host, port, echo):
     """
     Runs a threaded UDP server that logs all datagrams it receives. It can alos act as
     an UDP echo server using the --echo flag
 
     """
     if echo:
-        request_handler = EchoUdpHandler
+        request_handler = EchoTCPHandler
     else:
-        request_handler = SimpleUdpHandler
+        request_handler = SimpleTCPHandler
 
-    with ThreadingUDPServer((host, port), request_handler) as server:
+    with ThreadingTCPServer((host, port), request_handler) as server:
         click.secho(
             f"Staring {server.__class__.__name__} on {host}:{port}",
             fg="bright_yellow",
